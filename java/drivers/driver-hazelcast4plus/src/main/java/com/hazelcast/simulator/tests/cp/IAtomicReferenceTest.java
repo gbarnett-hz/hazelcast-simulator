@@ -68,6 +68,16 @@ public class IAtomicReferenceTest extends HazelcastTest {
         } while (!atomicReference.compareAndSet(observed, newValue));
     }
 
+    @TimeStep(prob = 0)
+    public void casOptimisticConcurrencyControlLite(ThreadState state) {
+        String observed;
+        String newValue;
+        do {
+            observed = atomicReference.get(); // because we're modelling the pattern -- we know it's [v]...
+            newValue = observed;
+        } while (!atomicReference.compareAndSetFingerprint(observed, newValue));
+    }
+
     public class ThreadState extends BaseThreadState {
         final IFunction<String, String> identity = s -> s;
     }
