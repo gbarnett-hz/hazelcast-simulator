@@ -34,6 +34,7 @@ import org.apache.logging.log4j.Logger;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static com.hazelcast.simulator.utils.CommonUtils.sleepMillisThrowException;
 import static com.hazelcast.simulator.utils.FileUtils.getUserDir;
@@ -104,6 +105,26 @@ public class Hazelcast4PlusDriver extends Driver<HazelcastInstance> {
         LOGGER.info(format("%s HazelcastInstance started", workerType));
         warmupPartitions(hazelcastInstance);
         LOGGER.info("Warmed up partitions");
+	if (!"javaclient".equals(workerType)) {
+        String shutdownMemberKey = "shutdown_member";
+            if (properties.get(shutdownMemberKey) != null && properties.get(shutdownMemberKey).equals(properties.get("PRIVATE_ADDRESS"))) {
+            String shutdownMemberInSecondsKey = "shutdown_member_seconds";
+
+            if (properties.get(shutdownMemberInSecondsKey) != null) {
+                int secondsUntilShutdown = Integer.parseInt(properties.get(shutdownMemberInSecondsKey).trim());
+                LOGGER.info("This member will be shutdown in ~" + secondsUntilShutdown + " seconds ");
+                new Thread(() -> {
+                    try {
+                        TimeUnit.SECONDS.sleep(secondsUntilShutdown);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                    LOGGER.info("Shutting down member since ~" + secondsUntilShutdown + " has elapsed");
+                    hazelcastInstance.getLifecycleService().terminate();
+                }).start();
+            }
+      }
+        }
     }
 
     @Override
