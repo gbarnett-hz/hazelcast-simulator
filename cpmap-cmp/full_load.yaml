@@ -1,0 +1,42 @@
+- name: cpmap_scalability_comparison
+  duration: 20m
+  repetitions: 1
+  clients: 5
+  members: 3
+  driver: hazelcast-enterprise5
+  version: maven=6.0.0-SNAPSHOT
+  license_key:  
+  client_args: >
+    -Xms48g
+    -Xmx48g
+    --add-modules java.se
+    --add-exports java.base/jdk.internal.ref=ALL-UNNAMED
+    --add-opens java.base/java.lang=ALL-UNNAMED
+    --add-opens java.base/sun.nio.ch=ALL-UNNAMED
+    --add-opens java.management/sun.management=ALL-UNNAMED
+    --add-opens jdk.management/com.sun.management.internal=ALL-UNNAMED
+  member_args: >
+    -Xms48g
+    -Xmx48g
+    --add-modules java.se
+    --add-exports java.base/jdk.internal.ref=ALL-UNNAMED
+    --add-opens java.base/java.lang=ALL-UNNAMED
+    --add-opens java.base/sun.nio.ch=ALL-UNNAMED
+    --add-opens java.management/sun.management=ALL-UNNAMED
+    --add-opens jdk.management/com.sun.management.internal=ALL-UNNAMED
+  loadgenerator_hosts: loadgenerators
+  node_hosts: nodes
+  verify_enabled: True
+  performance_monitor_interval_seconds: 1
+  warmup_seconds: 60
+  cooldown_seconds: 60
+  parallel: False
+  test:
+    - class: com.hazelcast.simulator.tests.cp.CPMapScalabitityComparisonTest
+      name: full_load
+      threadCount: 40
+      mode: PARTITIONED
+      keyCount: 480_000_000
+      getProb: 0
+      setProb: 0
+      putIfAbsentProb: 1
