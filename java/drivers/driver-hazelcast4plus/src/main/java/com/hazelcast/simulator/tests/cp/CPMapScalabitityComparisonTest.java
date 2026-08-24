@@ -28,6 +28,7 @@ import com.hazelcast.simulator.tests.cp.helpers.CPMapPartitioned;
 import com.hazelcast.simulator.utils.ThreadSpawner;
 
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import static org.junit.Assert.assertNotNull;
@@ -76,6 +77,7 @@ public class CPMapScalabitityComparisonTest extends HazelcastTest {
 
     private Function<String, Integer> getter;
     private BiConsumer<String, Integer> setter;
+    private BiFunction<String, Integer, Integer> putIfAbsenter;
     private IList<long[]> operationCounts;
 
     private static String keyForIndex(int index) {
@@ -113,6 +115,7 @@ public class CPMapScalabitityComparisonTest extends HazelcastTest {
                 CPMap<String, Integer> cpMap = targetInstance.getCPSubsystem().getMap(name);
                 getter = cpMap::get;
                 setter = cpMap::set;
+                putIfAbsenter = cpMap::putIfAbsent;
                 break;
             case PARTITIONED:
                 if (!isPrime(partitionCount)) {
@@ -133,6 +136,7 @@ public class CPMapScalabitityComparisonTest extends HazelcastTest {
                         new CPMapPartitioned<>(targetInstance, name, partitionCount);
                 getter = partitioned::get;
                 setter = partitioned::set;
+                putIfAbsenter = partitioned::putIfAbsent;
                 break;
             default:
                 throw new IllegalStateException("Unknown mode: " + mode);
@@ -141,6 +145,9 @@ public class CPMapScalabitityComparisonTest extends HazelcastTest {
         operationCounts = targetInstance.getList(name + "Report");
     }
 
+    // note: this is used to bound the storage before the test runs so we remove that variable
+    // for snapshotting it means that we're generally communicating a 'full' snapshot per snapshot 
+    // event rather than some intermediate size.
     @Prepare(global = true)
     public void prepare() {
         logger.info(name + ": preloading " + keyCount + " keys, approximate dataset size: "
@@ -193,20 +200,29 @@ public class CPMapScalabitityComparisonTest extends HazelcastTest {
         state.setCount++;
     }
 
+    @TimeStep(prob = 0)
+    public void putIfAbsent(ThreadState state) {
+        putIfAbsenter.apply(state.randomKey(), VALUE);
+        state.putIfAbsentCount++;
+    }
+
     @AfterRun
     public void afterRun(ThreadState state) {
-        operationCounts.add(new long[]{state.getCount, state.setCount});
+        operationCounts.add(new long[]{state.getCount, state.setCount, state.putIfAbsentCount});
     }
 
     @Verify(global = true)
     public void verify() {
         long totalGets = 0;
         long totalSets = 0;
+        long totalPutIfAbsents = 0;
         for (long[] counts : operationCounts) {
             totalGets += counts[0];
             totalSets += counts[1];
+            totalPutIfAbsents += counts[2];
         }
         logger.info(name + ": totalGets=" + totalGets + " totalSets=" + totalSets
+                + " totalPutIfAbsents=" + totalPutIfAbsents
                 + " from " + operationCounts.size() + " worker threads");
 
         // sanity-check a handful of sample keys rather than scanning the whole keyspace
@@ -220,6 +236,7 @@ public class CPMapScalabitityComparisonTest extends HazelcastTest {
     public class ThreadState extends BaseThreadState {
         long getCount;
         long setCount;
+        long putIfAbsentCount;
 
         String randomKey() {
             return keyForIndex(randomInt(keyCount));
