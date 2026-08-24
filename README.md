@@ -137,7 +137,7 @@ docker run --rm -it -v "$(pwd):/workspace" -v ~/.aws:/root/.aws:ro hazelcast/sim
     ```shell
     $ cd hazelcast-simulator
     $ # python 3.11 is the version that is currently supported
-    $ python3.11 -m venv venv 
+    $ python3.11 -m venv .venv 
     $ # activate the virtual environment appropriate to your shell, e.g. in bash:
     $ source ./venv/bin/activate
     $ pip install -r requirements.txt
