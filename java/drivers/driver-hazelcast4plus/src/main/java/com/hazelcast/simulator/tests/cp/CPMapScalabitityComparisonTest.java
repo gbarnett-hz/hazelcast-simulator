@@ -27,6 +27,8 @@ import com.hazelcast.simulator.test.annotations.Verify;
 import com.hazelcast.simulator.tests.cp.helpers.CPMapPartitioned;
 import com.hazelcast.simulator.utils.ThreadSpawner;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -74,6 +76,8 @@ public class CPMapScalabitityComparisonTest extends HazelcastTest {
     public int operationThreads = 36;
     // number of threads used to parallelize the one-off keyspace preload
     public int preloadThreads = 8;
+    // how often (in milliseconds) the preload emits a progress log line
+    public long preloadProgressLogIntervalMs = 15_000;
 
     private Function<String, Integer> getter;
     private BiConsumer<String, Integer> setter;
@@ -153,6 +157,23 @@ public class CPMapScalabitityComparisonTest extends HazelcastTest {
         logger.info(name + ": preloading " + keyCount + " keys, approximate dataset size: "
                 + humanReadableBytes(estimatedDatasetSizeBytes()));
 
+        AtomicLong preloadedCount = new AtomicLong();
+        AtomicBoolean preloadDone = new AtomicBoolean();
+        long startMillis = System.currentTimeMillis();
+
+        Thread progressLogger = new Thread(() -> {
+            while (!preloadDone.get()) {
+                try {
+                    Thread.sleep(preloadProgressLogIntervalMs);
+                } catch (InterruptedException e) {
+                    return;
+                }
+                logPreloadProgress(preloadedCount.get(), startMillis);
+            }
+        }, name + "-preload-progress");
+        progressLogger.setDaemon(true);
+        progressLogger.start();
+
         ThreadSpawner spawner = new ThreadSpawner(name);
         int shardSize = (keyCount + preloadThreads - 1) / preloadThreads;
         for (int t = 0; t < preloadThreads; t++) {
@@ -161,11 +182,38 @@ public class CPMapScalabitityComparisonTest extends HazelcastTest {
             spawner.spawn(() -> {
                 for (int i = start; i < end; i++) {
                     setter.accept(keyForIndex(i), VALUE);
+                    preloadedCount.incrementAndGet();
                 }
             });
         }
         spawner.awaitCompletion();
+
+        preloadDone.set(true);
+        progressLogger.interrupt();
         logger.info(name + ": preloaded " + keyCount + " keys of " + KEY_LENGTH + " bytes each");
+    }
+
+    private void logPreloadProgress(long preloadedCount, long startMillis) {
+        double percentDone = 100.0 * preloadedCount / keyCount;
+        long elapsedMillis = System.currentTimeMillis() - startMillis;
+        double keysPerSecond = elapsedMillis > 0 ? preloadedCount / (elapsedMillis / 1000.0) : 0;
+        long remainingKeys = keyCount - preloadedCount;
+        String eta = keysPerSecond > 0 ? formatDuration((long) (remainingKeys / keysPerSecond)) : "unknown";
+        logger.info(String.format("%s: preload progress %,d/%,d keys (%.1f%%), %.0f keys/sec, ETA %s",
+                name, preloadedCount, keyCount, percentDone, keysPerSecond, eta));
+    }
+
+    private static String formatDuration(long seconds) {
+        long hours = seconds / 3600;
+        long minutes = (seconds % 3600) / 60;
+        long secs = seconds % 60;
+        if (hours > 0) {
+            return String.format("%dh%02dm%02ds", hours, minutes, secs);
+        } else if (minutes > 0) {
+            return String.format("%dm%02ds", minutes, secs);
+        } else {
+            return secs + "s";
+        }
     }
 
     // rough approximation of the raw dataset size: keyCount * (key bytes + value bytes), ignoring per-entry
