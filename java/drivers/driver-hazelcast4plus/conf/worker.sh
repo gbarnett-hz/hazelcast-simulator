@@ -208,7 +208,14 @@ JVM_ARGS="$JVM_OPTIONS $JVM_ARGS"
 
 MAIN=com.hazelcast.simulator.worker.Worker
 
-java -classpath "$CLASSPATH" ${JVM_ARGS} ${MAIN}
+# Run java as a background child (not 'exec') so the cleanup trap above still runs after it
+# exits, but forward SIGTERM to it explicitly: the Agent's process.destroy() only signals this
+# script's own pid, and without this trap the JVM would never see it, so shutdown hooks (e.g.
+# JFR dumponexit) would never run.
+java -classpath "$CLASSPATH" ${JVM_ARGS} ${MAIN} &
+JAVA_PID=$!
+trap 'kill -TERM "$JAVA_PID" 2>/dev/null || true; wait "$JAVA_PID"' TERM
+wait "$JAVA_PID"
 
 #########################################################################
 # Yourkit

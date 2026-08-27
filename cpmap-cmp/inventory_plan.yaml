@@ -23,7 +23,7 @@ keypair:
     private_key: key
 
 nodes:
-    count: 3
+    count: 9
     instance_type: c5.9xlarge
     ami: ami-04e601abe3e1a910f
     user: ubuntu

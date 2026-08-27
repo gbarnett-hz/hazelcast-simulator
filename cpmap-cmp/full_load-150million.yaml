@@ -1,14 +1,21 @@
 - name: cpmap_scalability_comparison
-  duration: 20m
+  duration: 10m
   repetitions: 1
   clients: 5
-  members: 3
+  members: 9
   driver: hazelcast-enterprise5
   version: maven=6.0.0-SNAPSHOT
-  license_key:  
+  license_key:   
   client_args: >
     -Xms48g
     -Xmx48g
+    -XX:+HeapDumpOnOutOfMemoryError
+    -XX:HeapDumpPath=/home/ubuntu
+    -XX:+UnlockDiagnosticVMOptions
+    -XX:+DebugNonSafepoints
+    -XX:+PreserveFramePointer
+    -XX:StartFlightRecording=filename=recording.jfr,dumponexit=true,settings=profile
+    -Xlog:gc*:file=gc.log:time,uptime,level,tags
     --add-modules java.se
     --add-exports java.base/jdk.internal.ref=ALL-UNNAMED
     --add-opens java.base/java.lang=ALL-UNNAMED
@@ -18,6 +25,13 @@
   member_args: >
     -Xms48g
     -Xmx48g
+    -XX:+HeapDumpOnOutOfMemoryError
+    -XX:HeapDumpPath=/home/ubuntu
+    -XX:+UnlockDiagnosticVMOptions
+    -XX:+DebugNonSafepoints
+    -XX:+PreserveFramePointer
+    -XX:StartFlightRecording=filename=recording.jfr,dumponexit=true,settings=profile
+    -Xlog:gc*:file=gc.log:time,uptime,level,tags
     --add-modules java.se
     --add-exports java.base/jdk.internal.ref=ALL-UNNAMED
     --add-opens java.base/java.lang=ALL-UNNAMED
@@ -36,7 +50,8 @@
       name: full_load
       threadCount: 40
       mode: PARTITIONED
-      keyCount: 480_000_000
+      keyCount: 150_000_000
+      preloadThreads: 256
       getProb: 0
       setProb: 0
       putIfAbsentProb: 1

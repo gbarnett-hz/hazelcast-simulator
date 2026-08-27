@@ -39,3 +39,25 @@ Disadvantages,
 - Partitions need to be defined and calculated to strike a balance between the following:
   - `CPMap` (partition) size: compromise between partition residen data size and snapshot cost
   - `CPGroup` mapping to a `CPMap`. Here, there is a one-to-one mapping, and it's testing in a way where for a 36 vCPU machine each `CPGroup` should be mapped-to a distinct operation thread. The best case. 
+- Sustained load requires modifying the Raft advance log for snapshotting
+  - without this the deefault results in frequent sawtoothing GC can be observed that manifests into full GC which results in loss of servicing access requests (this is not specific to `CPMap` or `CPMapPartitioned`)
+  - this configuration impacts `RaftLog`'s size
+  - the log advance configuration requires performance and memory analysis to find its approximate value
+  - configuration is a global Raft property, not specific to a `CPGroup`
+- Loss of transactionality
+  - batch commands, should they ever be introduced, would only be transactional across a single partition. For example, `map.setAll(...)`, would not be transactional in its entirety, only each partition's key space
+
+
+Topology,
+
+- Every member of a `CPGroup` hosts the full data residency of that `CPGroup`
+  - Generally, we need more CP members than the `CPGroup` size, so that we can reduce the resident memory per-JVM
+  - Factors include,
+    - snapshotting
+    - `RaftLog`
+    - internal backing data structures, e.g. the map itself, auxilary data structures
+
+Auxilary requirements,
+
+- lass
+However, for my small testing, you need to quite aggressively add CP members to reduce the memory pressure issues, e.g. 50 million keyset in 9 CP member, 3 `CPGroup` vs. 100 million keyset in the same topology results in amplified sawtoothing and full GCs occur (twice within 10 minute run). Going to 150 million within the same cluster size resulted in...

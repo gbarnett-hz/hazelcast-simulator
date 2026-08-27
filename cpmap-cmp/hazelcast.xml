@@ -25,8 +25,22 @@
     </properties>
 
     <cp-subsystem>
-        <cp-member-count>3</cp-member-count>
+        <cp-member-count>9</cp-member-count>
         <group-size>3</group-size>
+        <raft-algorithm>
+            <!--
+                Default is 10000. At this workload's steady-state per-group commit rate
+                (~2,850 ops/s across 31 partitioned CP groups), the default triggers a
+                chunked CPMap snapshot roughly every 3.5s per group leader, which JFR
+                allocation profiling showed dominates allocation (~68% of sampled bytes
+                during steady-state, see analysis/findings.md) via unsized ArrayList
+                growth in KeyValueDataChunk.addToChunk. Raised 20x here to ~70s between
+                snapshots per group, to see whether the heap sawtooth/Evacuation Failure
+                frequency drops in direct proportion.
+            -->
+            <commit-index-advance-count-to-snapshot>200000</commit-index-advance-count-to-snapshot>
+      <!--<commit-index-advance-count-to-snapshot>100000</commit-index-advance-count-to-snapshot>-->
+        </raft-algorithm>
         <maps>
             <!--
                 CPMapConfig lookup is keyed on the "base name" only (everything before the '@'
@@ -35,10 +49,6 @@
                 here, keyed by the test's plain name, applies independently to every one of that test's
                 constituent CPMap shards: one entry per test name, not one per shard.
             -->
-            <map>
-                <name>cpmap_partitioned</name>
-                <max-size-mb>1800</max-size-mb>
-            </map>
             <map>
                 <name>full_load</name>
                 <max-size-mb>1800</max-size-mb>
