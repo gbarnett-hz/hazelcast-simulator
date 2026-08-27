@@ -57,7 +57,6 @@ Topology,
     - `RaftLog`
     - internal backing data structures, e.g. the map itself, auxilary data structures
 
-Auxilary requirements,
+Auxilary bits,
 
-- lass
-However, for my small testing, you need to quite aggressively add CP members to reduce the memory pressure issues, e.g. 50 million keyset in 9 CP member, 3 `CPGroup` vs. 100 million keyset in the same topology results in amplified sawtoothing and full GCs occur (twice within 10 minute run). Going to 150 million within the same cluster size resulted in...
+- From my small testing, you need to aggressively add CP members to reduce the memory pressure issues
